@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<title>Bench140 — Plan hacia 140kg en press de banca</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body data-tema="oscuro">
+
+<!-- ============ PANTALLA DE CONFIGURACIÓN INICIAL ============ -->
+<div id="vista-setup" class="vista activa">
+  <div class="setup-card">
+    <h1>🏋️ Bench140</h1>
+    <p class="subtitulo">Tu plan hacia 140 kg en press de banca, entrenando principalmente con máquinas. Todos tus datos quedan guardados en este dispositivo.</p>
+
+    <form id="form-setup">
+      <div class="grid-2">
+        <label>Edad
+          <input type="number" name="edad" min="10" max="90" value="25" required>
+        </label>
+        <label>Peso corporal (kg)
+          <input type="number" name="peso_corporal" min="30" max="250" step="0.1" value="75" required>
+        </label>
+        <label>Altura (cm)
+          <input type="number" name="altura" min="100" max="230" value="175" required>
+        </label>
+        <label>% Preferencia máquinas vs libre
+          <input type="range" name="pref_maquina_pct" min="0" max="100" value="70">
+          <span id="pref-valor">70%</span>
+        </label>
+      </div>
+
+      <fieldset>
+        <legend>1RM actual en press de banca</legend>
+        <div class="tabs-mini">
+          <button type="button" class="tab-mini activa" data-modo="directo">Lo conozco</button>
+          <button type="button" class="tab-mini" data-modo="test">Hacer test (10RM o menos)</button>
+        </div>
+        <div id="modo-directo">
+          <label>1RM estimado (kg)
+            <input type="number" name="rm_banca" min="5" max="300" step="0.5" value="60">
+          </label>
+        </div>
+        <div id="modo-test" class="oculto">
+          <div class="grid-2">
+            <label>Peso usado (kg)
+              <input type="number" name="test_peso" min="5" max="300" step="0.5">
+            </label>
+            <label>Repeticiones realizadas
+              <input type="number" name="test_reps" min="1" max="20">
+            </label>
+          </div>
+          <p class="ayuda">Se calculará tu 1RM estimado con la fórmula de Epley/Brzycki.</p>
+        </div>
+      </fieldset>
+
+      <label>Lesiones o restricciones (opcional)
+        <textarea name="lesiones" maxlength="500" placeholder="Ej: molestia en hombro derecho"></textarea>
+      </label>
+
+      <button type="submit" class="btn-primario">Generar mi plan de entrenamiento</button>
+    </form>
+  </div>
+</div>
+
+<!-- ============ APP PRINCIPAL ============ -->
+<div id="vista-app" class="vista">
+  <header class="topbar">
+    <div class="logo">🏋️ Bench140</div>
+    <div class="meta-objetivo">
+      Objetivo: <strong>140 kg</strong> · Actual: <strong id="rm-actual-top">--</strong> kg
+      <div class="barra-progreso"><div id="barra-progreso-fill" class="fill"></div></div>
+    </div>
+    <button id="btn-tema" class="btn-icono" title="Cambiar tema">🌓</button>
+  </header>
+
+  <div id="alerta-inactividad" class="alerta oculto"></div>
+
+  <nav class="tabs">
+    <button class="tab activa" data-vista="hoy">Hoy</button>
+    <button class="tab" data-vista="calendario">Calendario</button>
+    <button class="tab" data-vista="estadisticas">Estadísticas</button>
+    <button class="tab" data-vista="ejercicios">Ejercicios</button>
+    <button class="tab" data-vista="ajustes">Ajustes</button>
+  </nav>
+
+  <main>
+    <!-- ---- VISTA: HOY ---- -->
+    <section id="panel-hoy" class="panel activo">
+      <div class="bloque-info-card">
+        <h2 id="bloque-nombre">--</h2>
+        <p id="bloque-descripcion" class="ayuda"></p>
+        <div class="dia-marcado-row">
+          <span id="fecha-hoy-label"></span>
+          <div class="botones-marca">
+            <button id="btn-marcar-realizado" class="btn-pequeno verde">✔ Realizado</button>
+            <button id="btn-marcar-no-realizado" class="btn-pequeno rojo">✘ No realizado</button>
+          </div>
+        </div>
+      </div>
+
+      <h3 id="dia-titulo">Entrenamiento de hoy</h3>
+      <div id="lista-ejercicios-hoy" class="lista-ejercicios"></div>
+
+      <button id="btn-guardar-sesion" class="btn-primario">💾 Guardar sesión de hoy</button>
+    </section>
+
+    <!-- ---- VISTA: CALENDARIO ---- -->
+    <section id="panel-calendario" class="panel">
+      <div class="calendario-header">
+        <button id="cal-prev" class="btn-icono">‹</button>
+        <h2 id="cal-mes-anio">--</h2>
+        <button id="cal-next" class="btn-icono">›</button>
+      </div>
+      <div id="calendario-grid" class="calendario-grid"></div>
+      <div class="leyenda">
+        <span><i class="dot verde"></i> Realizado</span>
+        <span><i class="dot rojo"></i> No realizado</span>
+        <span><i class="dot amarillo"></i> Recuperación (sábado)</span>
+      </div>
+    </section>
+
+    <!-- ---- VISTA: ESTADÍSTICAS ---- -->
+    <section id="panel-estadisticas" class="panel">
+      <div class="cards-resumen" id="cards-resumen"></div>
+
+      <h3>Evolución de 1RM estimado (press de banca)</h3>
+      <canvas id="chart-1rm" height="100"></canvas>
+
+      <h3>Volumen semanal por grupo muscular (planificado)</h3>
+      <canvas id="chart-volumen" height="100"></canvas>
+
+      <h3>Récords personales</h3>
+      <table class="tabla" id="tabla-records">
+        <thead><tr><th>Ejercicio</th><th>Peso máx (kg)</th><th>Volumen máx</th></tr></thead>
+        <tbody></tbody>
+      </table>
+
+      <div class="acciones-fila">
+        <button id="btn-test-1rm" class="btn-secundario">📏 Registrar nuevo test de 1RM</button>
+        <button id="btn-avanzar-bloque" class="btn-secundario">⏭ Avanzar al siguiente bloque</button>
+      </div>
+    </section>
+
+    <!-- ---- VISTA: EJERCICIOS ---- -->
+    <section id="panel-ejercicios" class="panel">
+      <h2>Catálogo de ejercicios</h2>
+      <button id="btn-nuevo-ejercicio" class="btn-secundario">+ Agregar ejercicio</button>
+      <div id="lista-catalogo" class="lista-catalogo"></div>
+    </section>
+
+    <!-- ---- VISTA: AJUSTES ---- -->
+    <section id="panel-ajustes" class="panel">
+      <h2>Ajustes</h2>
+      <div class="ajustes-grid">
+        <button id="btn-exportar" class="btn-secundario">⬇ Exportar progreso (JSON)</button>
+        <label class="btn-secundario archivo-label">
+          ⬆ Importar progreso (JSON)
+          <input type="file" id="input-importar" accept="application/json" class="oculto">
+        </label>
+        <button id="btn-reconfigurar" class="btn-secundario">🔄 Repetir configuración inicial</button>
+      </div>
+      <h3>Perfil actual</h3>
+      <div id="perfil-resumen" class="ayuda"></div>
+      <p class="ayuda" style="margin-top:16px;">⚠️ Tus datos se guardan únicamente en este dispositivo/navegador (localStorage). Si cambiás de celular, borrás el navegador, o usás "modo incógnito", podés perder tu progreso. Usá "Exportar" seguido para tener un backup.</p>
+    </section>
+  </main>
+</div>
+
+<!-- ---- MODAL: Formulario de ejercicio (crear/editar) ---- -->
+<div id="modal-ejercicio" class="modal oculto">
+  <div class="modal-contenido">
+    <h3 id="modal-ejercicio-titulo">Nuevo ejercicio</h3>
+    <form id="form-ejercicio">
+      <input type="hidden" name="id">
+      <label>Nombre <input type="text" name="nombre" maxlength="100" required></label>
+      <label>Grupo muscular <input type="text" name="grupo" maxlength="50" required></label>
+      <label>Tipo
+        <select name="tipo">
+          <option value="maquina">Máquina</option>
+          <option value="polea">Polea</option>
+          <option value="barra">Barra</option>
+          <option value="mancuerna">Mancuerna</option>
+          <option value="peso_corporal">Peso corporal</option>
+        </select>
+      </label>
+      <label>Patrón de movimiento
+        <select name="patron">
+          <option value="empuje_horizontal">Empuje horizontal</option>
+          <option value="empuje_vertical">Empuje vertical</option>
+          <option value="traccion_horizontal">Tracción horizontal</option>
+          <option value="traccion_vertical">Tracción vertical</option>
+          <option value="rodilla">Rodilla (pierna)</option>
+          <option value="cadera">Cadera (pierna)</option>
+          <option value="accesorio">Accesorio / aislamiento</option>
+        </select>
+      </label>
+      <label>Curva de fuerza
+        <select name="curva">
+          <option value="constante">Constante</option>
+          <option value="creciente">Creciente</option>
+          <option value="decreciente">Decreciente</option>
+        </select>
+      </label>
+      <label>Factor de transferencia a 1RM banca (0 a 1.5)
+        <input type="number" name="factor_1rm" min="0" max="1.5" step="0.05" value="0.2">
+      </label>
+      <label>Nota técnica <textarea name="nota" maxlength="300"></textarea></label>
+      <div class="modal-botones">
+        <button type="button" id="btn-cerrar-modal" class="btn-secundario">Cancelar</button>
+        <button type="submit" class="btn-primario">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ---- MODAL: Alternativas de ejercicio ---- -->
+<div id="modal-alternativas" class="modal oculto">
+  <div class="modal-contenido">
+    <h3>Ejercicios alternativos</h3>
+    <div id="lista-alternativas"></div>
+    <button type="button" id="btn-cerrar-modal-alt" class="btn-secundario">Cerrar</button>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
